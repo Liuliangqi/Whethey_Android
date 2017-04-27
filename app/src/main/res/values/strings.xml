@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Whethey</string>
+    <string name="no_daily_data">There is no data to display</string>
 </resources>

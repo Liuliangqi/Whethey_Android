@@ -1,7 +1,8 @@
-package liuliangqi.whethey;
+package liuliangqi.whethey.ui;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
@@ -15,7 +16,6 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Build;
 import android.provider.Settings;
-import android.support.annotation.ColorRes;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -28,6 +28,7 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -36,6 +37,12 @@ import java.util.List;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import butterknife.OnClick;
+import liuliangqi.whethey.R;
+import liuliangqi.whethey.weather.CurrentWhether;
+import liuliangqi.whethey.weather.Day;
+import liuliangqi.whethey.weather.Forecast;
+import liuliangqi.whethey.weather.Hour;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
@@ -44,7 +51,8 @@ import okhttp3.Response;
 
 public class MainActivity extends AppCompatActivity implements LocationListener{
     public static final String TAG = MainActivity.class.getSimpleName();
-    private CurrentWhether mCurrentWhether;
+    public static final String DAILY_FORECAST = "DAILY_FORECAST";
+    private Forecast mForecast;
 
     @BindView(R.id.timeLabel)
     TextView mTimeLabel;
@@ -210,7 +218,7 @@ public class MainActivity extends AppCompatActivity implements LocationListener{
                         //注释部分是Synchronized
                         //Response response = call.execute();
                         if(response.isSuccessful()){
-                            mCurrentWhether = getCurrentDetails(jsonData);
+                            mForecast = getForecastDetails(jsonData);
                             runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
@@ -242,32 +250,95 @@ public class MainActivity extends AppCompatActivity implements LocationListener{
             mProgressBar.setVisibility(View.INVISIBLE);
             mRefreshImageView.setVisibility(View.VISIBLE);
         }
+        if(mLocation == null){
+            Toast.makeText(this, "Network doesn't work", Toast.LENGTH_SHORT).show();
+            mLatitude = 0.0;
+            mLongitude = 0.0;
+            return;
+        }
         mLatitude = mLocation.getLatitude();
         mLongitude = mLocation.getLongitude();
     }
 
     private void updateDisplay() {
-        mTemperatureLabel.setText(mCurrentWhether.getTemperature() + "");
-        mTimeLabel.setText("At " + mCurrentWhether.getFormattedTime() + " it will be");
-        mHumidityValue.setText(mCurrentWhether.getHumidity() + "");
-        mPrecipValue.setText(mCurrentWhether.getPrecipChance() + "%");
-        mSummaryLabel.setText(mCurrentWhether.getSummary());
+        CurrentWhether currentWhether = mForecast.getCurrentWhether();
+        mTemperatureLabel.setText(currentWhether.getTemperature() + "");
+        mTimeLabel.setText("At " + currentWhether.getFormattedTime() + " it will be");
+        mHumidityValue.setText(currentWhether.getHumidity() + "");
+        mPrecipValue.setText(currentWhether.getPrecipChance() + "%");
+        mSummaryLabel.setText(currentWhether.getSummary());
         mLocationLabel.setText(updateWithNewLocation(mLatitude, mLongitude));
-        Drawable drawable = getResources().getDrawable(mCurrentWhether.getIconId());
+        Drawable drawable = getResources().getDrawable(currentWhether.getIconId());
         mIconImageView.setImageDrawable(drawable);
         setBackground();
     }
 
     private void setBackground(){
-        if(mCurrentWhether.getTemperature() > 20 && mCurrentWhether.getTemperature() < 40){
+        CurrentWhether current = mForecast.getCurrentWhether();
+        if(current.getTemperature() > 20 && current.getTemperature() < 40){
             mRelativeLayout.setBackgroundColor(Color.parseColor("#FFC0CB"));
-        }else if(mCurrentWhether.getTemperature() >= 40 && mCurrentWhether.getTemperature() < 70){
+        }else if(current.getTemperature() >= 40 && current.getTemperature() < 70){
             mRelativeLayout.setBackgroundColor(Color.parseColor("#40E0D0"));
-        }else if(mCurrentWhether.getTemperature() >= 70){
+        }else if(current.getTemperature() >= 70){
             mRelativeLayout.setBackgroundColor(Color.parseColor("#FC970B"));
         }else{
             mRelativeLayout.setBackgroundColor(Color.parseColor("#3F4651"));
         }
+    }
+
+    private Forecast getForecastDetails(String jsonData) throws JSONException{
+        Forecast forecast = new Forecast();
+
+        forecast.setCurrentWhether(getCurrentDetails(jsonData));
+        forecast.setHourlyForecast(getHourlyForecast(jsonData));
+        forecast.setDailyForecast(getDailyForecast(jsonData));
+
+        return forecast;
+    }
+
+    private Day[] getDailyForecast(String jsonData) throws JSONException{
+        JSONObject forecast = new JSONObject(jsonData);
+        String timezone = forecast.getString("timezone");
+
+        JSONObject daily = forecast.getJSONObject("daily");
+        JSONArray data = daily.getJSONArray("data");
+        Day[] days = new Day[data.length()];
+        for(int i = 0; i < data.length(); i++){
+            JSONObject jsonDay = data.getJSONObject(i);
+            Day day = new Day();
+
+            day.setSummary(jsonDay.getString("summary"));
+            day.setIcon(jsonDay.getString("icon"));
+            day.setTime(jsonDay.getLong("time"));
+            day.setTemperatureMax(jsonDay.getDouble("temperatureMax"));
+            day.setTimezone(timezone);
+
+            days[i] = day;
+        }
+
+        return days;
+    }
+
+    private Hour[] getHourlyForecast(String jsonData) throws JSONException{
+        JSONObject forecast = new JSONObject(jsonData);
+        String timeZone = forecast.getString("timezone");
+
+        JSONObject hourly = forecast.getJSONObject("hourly");
+        JSONArray data = hourly.getJSONArray("data");
+        Hour[] hours = new Hour[data.length()];
+        for(int i = 0; i < data.length(); i++){
+            JSONObject jsonHour = data.getJSONObject(i);
+            Hour hour = new Hour();
+
+            hour.setSummary(jsonHour.getString("summary"));
+            hour.setTemperature(jsonHour.getDouble("temperature"));
+            hour.setIcon(jsonHour.getString("icon"));
+            hour.setTime(jsonHour.getLong("time"));
+            hour.setTimezone(timeZone);
+
+            hours[i] = hour;
+        }
+        return hours;
     }
 
     private CurrentWhether getCurrentDetails(String jsonData) throws JSONException{
@@ -351,5 +422,13 @@ public class MainActivity extends AppCompatActivity implements LocationListener{
     protected void onPause() {
         super.onPause();
         mLocationManager.removeUpdates(this);
+    }
+
+
+    @OnClick (R.id.daily)
+    public void startDailyActivity(View view){
+        Intent intent = new Intent(this, DailyForecastActivity.class);
+        intent.putExtra(DAILY_FORECAST, mForecast.getDailyForecast());
+        startActivity(intent);
     }
 }

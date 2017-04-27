@@ -1,4 +1,4 @@
-package liuliangqi.whethey;
+package liuliangqi.whethey.ui;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
