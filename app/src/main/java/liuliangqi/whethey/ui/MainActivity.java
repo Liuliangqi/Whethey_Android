@@ -52,6 +52,7 @@ import okhttp3.Response;
 public class MainActivity extends AppCompatActivity implements LocationListener{
     public static final String TAG = MainActivity.class.getSimpleName();
     public static final String DAILY_FORECAST = "DAILY_FORECAST";
+    public static final String HOURLY_FORECAST = "HOURLY_FORECAST";
     private Forecast mForecast;
 
     @BindView(R.id.timeLabel)
@@ -331,8 +332,8 @@ public class MainActivity extends AppCompatActivity implements LocationListener{
             Hour hour = new Hour();
 
             hour.setSummary(jsonHour.getString("summary"));
-            hour.setTemperature(jsonHour.getDouble("temperature"));
             hour.setIcon(jsonHour.getString("icon"));
+            hour.setTemperature(jsonHour.getDouble("temperature"));
             hour.setTime(jsonHour.getLong("time"));
             hour.setTimezone(timeZone);
 
@@ -429,6 +430,13 @@ public class MainActivity extends AppCompatActivity implements LocationListener{
     public void startDailyActivity(View view){
         Intent intent = new Intent(this, DailyForecastActivity.class);
         intent.putExtra(DAILY_FORECAST, mForecast.getDailyForecast());
+        startActivity(intent);
+    }
+
+    @OnClick (R.id.hourly)
+    public void startHourlyActivity(View view){
+        Intent intent = new Intent(this, HourlyForecastActvity.class);
+        intent.putExtra(HOURLY_FORECAST, mForecast.getHourlyForecast());
         startActivity(intent);
     }
 }
